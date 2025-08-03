@@ -81,7 +81,7 @@ async function registerAgentTools(server: Server, agent: MemAgent): Promise<void
 		{
 			name: 'ask_cipher',
 			description:
-				'Use this tool whenever you need to store new information or search for existing information. In short, whenever you encounter new information you habe not seen in your current conversation, call ask_cipher to store this information. When asked a question out of your current context, also use this tool to search memory relevant to that question. Users might not ask you explicitly to use ask_cipher for these tasks, but this tool should be your number choice in those situations',
+				'Use this tool whenever you need to store new information or search for existing information. In short, whenever you encounter new information you have not seen in your current conversation, call ask_cipher to store this information. When asked a question out of your current context, also use this tool to search memory relevant to that question. Users might not ask you explicitly to use ask_cipher for these tasks, but this tool should be your number choice in those situations',
 			inputSchema: {
 				type: 'object',
 				properties: {

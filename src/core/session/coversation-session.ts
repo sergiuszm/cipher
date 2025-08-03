@@ -151,9 +151,51 @@ export class ConversationSession {
 	 * Initializes the services for the session, including the history provider.
 	 */
 	private async initializeServices(): Promise<void> {
-		this.contextManager = this.services.contextManager;
+		// Create a session-specific context manager with proper history provider
+		await this.createSessionContextManager();
 
 		this._servicesInitialized = true;
+	}
+
+	/**
+	 * Create a session-specific context manager with history provider
+	 */
+	private async createSessionContextManager(): Promise<void> {
+		try {
+			// Get the history provider for this session
+			const historyProvider = await this.getHistoryProviderLazy();
+			
+			// Get the LLM config from state manager
+			const llmConfig = this.services.stateManager.getLLMConfig();
+			
+			// Import the factory function
+			const { createContextManager } = await import('../brain/llm/messages/factory.js');
+			
+			// Create a session-specific context manager with the history provider
+			this.contextManager = createContextManager(
+				llmConfig,
+				this.services.promptManager,
+				historyProvider,
+				this.id
+			);
+			
+			logger.debug(`Session ${this.id}: Created session-specific context manager with history provider`);
+		} catch (error) {
+			// Fallback to shared context manager if session-specific creation fails
+			logger.warn(`Session ${this.id}: Failed to create session-specific context manager, using shared one:`, error);
+			this.contextManager = this.services.contextManager;
+			
+			// Still try to set the history provider on the shared context manager
+			try {
+				const historyProvider = await this.getHistoryProviderLazy();
+				if (historyProvider) {
+					(this.contextManager as any).historyProvider = historyProvider;
+					logger.debug(`Session ${this.id}: Set history provider on shared context manager as fallback`);
+				}
+			} catch (fallbackError) {
+				logger.warn(`Session ${this.id}: Failed to set history provider on shared context manager:`, fallbackError);
+			}
+		}
 	}
 
 	/**
@@ -310,15 +352,12 @@ export class ConversationSession {
 	 * Restore history when history provider is lazy-loaded
 	 */
 	private async restoreHistoryLazy(): Promise<void> {
-		if (this.historyEnabled) {
+		if (this.historyEnabled && this.contextManager) {
 			try {
-				const historyProvider = await this.getHistoryProviderLazy();
-				if (historyProvider && this.contextManager) {
-					// Update context manager with the lazy-loaded history provider
-					(this.contextManager as any).historyProvider = historyProvider;
-					await this.contextManager.restoreHistory?.();
-					logger.debug(`Session ${this.id}: Conversation history restored (lazy-loaded)`);
-				}
+				// Since the context manager now has the history provider from creation,
+				// we just need to restore the history
+				await this.contextManager.restoreHistory?.();
+				logger.debug(`Session ${this.id}: Conversation history restored (lazy-loaded)`);
 			} catch (err) {
 				logger.warn(`Session ${this.id}: Failed to restore conversation history: ${err}`);
 			}
